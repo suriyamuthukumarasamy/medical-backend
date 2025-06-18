@@ -11,7 +11,7 @@ const authRoutes = require('./customer/routes/auth.route');
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT ;
+const PORT = process.env.PORT;
 
 // Middleware
 app.use(express.json());
@@ -22,10 +22,14 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
+// ✅ Root route to fix "Cannot GET /" error
+app.get('/', (req, res) => {
+  res.send('Welcome to the Medicine Backend API');
+});
 
 // Routes
 app.use('/api/medicines', productRoute); 
-app.use('/api/users', authRoutes); // optional fix for consistency
+app.use('/api/users', authRoutes); 
 
 // app.use('/seller', sellerProduct);
 

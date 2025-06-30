@@ -3,47 +3,69 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const connectDB = require('./db/connectDB');
 
-// Route imports
-const productRoute = require('./product/routes/products.routs');
-const authRoutes = require('./customer/routes/auth.route');
-// const sellerProduct = require('./admin/seller.route/seller.route');
-
+// Load environment variables
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3000;
 
-// Middleware
+//  Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(cors({
-  origin: ['http://localhost:3000', 'https://sports-ecommerce-frontend.vercel.app'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
 
-// ✅ Root route to fix "Cannot GET /" error
+//  CORS Setup
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      const allowedOrigins = ['http://localhost:3000', 'https://medical-backend-teal.vercel.app'];
+
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('❌ Not allowed by CORS'));
+      }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  })
+);
+
+//  Root Route
 app.get('/', (req, res) => {
   res.send('Welcome to the Medicine Backend API');
 });
 
-// Routes
-app.use('/api/medicines', productRoute); 
-app.use('/api/users', authRoutes); 
+//  Routes
+app.use('/api/medicines', require('./product/routes/products.routs'));
+app.use('/api/users', require('./customer/routes/auth.route'));
+app.use('/api/admin', require('./admin/admin.route/admin.route.js')); //  Add admin route here
 
-// app.use('/seller', sellerProduct);
+// ❌ Optional: if seller route is still in development
+// app.use('/seller', require('./admin/seller.route/seller.route'));
 
-// Database Connection and Server Start
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  });
-}).catch(error => {
-  console.error("Database connection failed:", error);
+//  Handle 404 for undefined routes
+app.use((req, res, next) => {
+  res.status(404).json({ message: '🚫 Route not found' });
 });
 
-// Global Error Handler (optional)
+//  Global Error Handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'An error occurred!' });
+  console.error('❌ Global Error:', err.stack);
+  res.status(err.status || 500).json({
+    message: err.message || 'Something went wrong!',
+    error: process.env.NODE_ENV === 'production' ? {} : err.stack,
+  });
 });
+
+// Connect to DB and Start Server
+connectDB()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`✅ Server running at http://localhost:${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error('❌ Database connection failed:', error.message);
+    process.exit(1);
+  });

@@ -1,162 +1,167 @@
-const { User } = require('../models/user.model')
-const bcrypt = require('bcryptjs');
-const { generateTokenAndSetCookie } = require('../utils/generateTokenAndSetCookie');
-// const { sendVerificationEmail, sendWelcomeEmail } = require('../mailtrap/emails');
+const User = require('../../customer/models/user.model'); // Import User model
+const bcrypt = require('bcryptjs'); // For hashing and comparing passwords
+const { generateTokenAndSetCookie } = require('../utils/generateTokenAndSetCookie'); // JWT helper
+
+// ✅ REGISTER NEW USER
 const signup = async (req, res) => {
   const { name, email, password, role } = req.body;
-  
-  // Validate input fields
+
   try {
-      if (!email || !password || !name || !role ) {
-          throw new Error("All fields are required");
-      }
-      const userAlreadyExists = await User.findOne({ email });
+    // 1. Validate input
+    if (!email || !password || !name || !role) {
+      return res.status(400).json({ success: false, message: "All fields are required" });
+    }
 
-      if (userAlreadyExists) {
-          return res.status(400).json({ success: false, message: "User already exists" });
-      }
+    // 2. Prevent admin registration from public
+    if (role === "admin") {
+      return res.status(403).json({ success: false, message: "Admin registration is not allowed" });
+    }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const user = new User({
-          name,
-          email,
-          password: hashedPassword,
-          role
-      });
+    // 3. Check if user already exists
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ success: false, message: "User already exists" });
+    }
 
-      await user.save();
+    // 4. Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-      // Generate JWT Token and Set Cookie
-      const token = generateTokenAndSetCookie(res, user._id);
+    // 5. Create new user
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role: role || "user",
+    });
 
-      // Send successful response
-      res.status(200).json({
-          success: true,
-          message: "User created successfully",
-          token,
-          user: {
-              ...user._doc,
-              password: undefined  // Ensure password is not included in the response
-          }
-      });
+    // 6. Generate JWT
+    const token = generateTokenAndSetCookie(res, user._id);
+    const tokenExpiry = Date.now() + 24 * 60 * 60 * 1000;
+
+    // 7. Return user (without password)
+    const { password: _, ...userData } = user._doc;
+
+    res.status(201).json({
+      success: true,
+      message: "User created successfully",
+      token,
+      tokenExpiry,
+      user: userData,
+    });
+
   } catch (error) {
-      console.error(error.stack); // Log error for better understanding
-      res.status(400).json({ success: false, message: error.message });
+    console.error("❌ Signup error:", error.message);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
-// const verifyEmail = async (req, res) =>{
-//     const {code} = req.body;
-//     try{
-//         const user = await User.findOne({verificationToken: code, verificationTokenExpiresAt: {$gt: Date.now()}});
-//         if(!user){
-//             return res.status(400).json({success: false, message: "Invalid or expired verification code"});
-//         }
 
-//         user.isVerified = true;
-//         user.verificationToken = undefined;
-//         user.verificationTokenExpiresAt = undefined;
-//         await user.save();
-
-//         await sendWelcomeEmail(user.email , user.name);
-
-//         res.status(200).json({success: true, message: "Email verified successfully"})
-//     }catch(error){
-//         res.status(400).json({success: false, message: error.message});
-//     }
-//     }
-
-const getAllUsers = async (req, res) => {
-    try {
-      const users = await User.find();
-      res.status(200).json(users);
-    } catch (error) {
-      res.status(500).json({ message: 'Server Error', error: error.message });
-    }
-  }
-
-  const getUserById = async (req, res) => {
-    try {
-      const user = await User.findById(req.params.id);
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-      res.status(200).json(user);
-    } catch (error) {
-      res.status(500).json({ message: 'Server Error', error: error.message });
-    }
-  }   
-
-const updateUser = async (req, res) => {
-    try {
-      const { name, email, role } = req.body;
-      const updatedUser = await User.findByIdAndUpdate(
-        req.params.id,
-        { name, email, role },
-        { new: true, runValidators: true }
-      );
-  
-      if (!updatedUser) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-  
-      res.status(200).json({ message: 'User updated successfully', user: updatedUser });
-    } catch (error) {
-      res.status(500).json({ message: 'Server Error', error: error.message });
-    }
-  }
-
- const deleteUser = async (req, res) => {
-    try {
-      const user = await User.findByIdAndDelete(req.params.id);
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-      res.status(200).json({ message: 'User deleted successfully' });
-    } catch (error) {
-      res.status(500).json({ message: 'Server Error', error: error.message });
-    }
-  }
-
+// ✅ LOGIN USER
 const login = async (req, res) => {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
   try {
-    // Find the user by email
+    // 1. Find user
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'Invalid email or password' });
     }
 
-    // Check if the password matches
+    // 2. Match password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
 
-    // Generate JWT and set it in a cookie
+    // 3. Generate token
     const token = generateTokenAndSetCookie(res, user._id);
+    const tokenExpiry = Date.now() + 24 * 60 * 60 * 1000;
 
-    res.status(200).json({success: true, 
-        message: 'Logged in successfully', 
-        token, 
-        user });
+    // 4. Return user data
+    const { password: _, ...userData } = user._doc;
+
+    res.status(200).json({
+      success: true,
+      message: 'Logged in successfully',
+      token,
+      tokenExpiry,
+      user: userData,
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("❌ Login error:", error.message);
+    res.status(500).json({ message: 'Server error' });
   }
-}
+};
 
+// ✅ LOGOUT USER
 const logout = async (req, res) => {
-    res.clearCookie('token');
-    res.status(200).json({ success: true, message: "Logged out successfully" });
-}
+  res.clearCookie('token');
+  res.status(200).json({ success: true, message: "Logged out successfully" });
+};
 
+// ✅ GET ALL USERS (Admin only)
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().select("-password");
+    res.status(200).json(users);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// ✅ GET USER BY ID
+const getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// ✅ UPDATE USER
+const updateUser = async (req, res) => {
+  try {
+    const { name, email, role } = req.body;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      { name, email, role },
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({ message: 'User updated successfully', user: updatedUser });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// ✅ DELETE USER
+const deleteUser = async (req, res) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.status(200).json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+// ✅ Export all functions
 module.exports = {
-    signup,
-    getAllUsers,
-    updateUser,
-    deleteUser,
-    getUserById,
-    login,
-    logout,
-    // verifyEmail
-}
+  signup,
+  login,
+  logout,
+  getAllUsers,
+  getUserById,
+  updateUser,
+  deleteUser,
+};

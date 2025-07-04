@@ -7,26 +7,31 @@ const {
   getUserById,
   updateUser,
   deleteUser,
+  createUserByAdmin,
 } = require('../controllers/auth.controller');
+
+const { protect, isAdmin } = require('../../admin/middleware/middleware');
 
 const router = express.Router();
 
-//  Registration (alias for frontend to use /register)
-router.post('/register', signup); // frontend expects /register
-// OR replace /signup with /register
+// Public registration
+router.post('/register', signup);
 
-//  Login / Logout
+// Login / logout
 router.post('/login', login);
 router.post('/logout', logout);
 
-// Get all users
-router.get('/allusers', getAllUsers);
+// Admin creates user (including admin)
+router.post('/create', protect, isAdmin, createUserByAdmin);
 
-//  Get, update, delete user by ID
+// Get all users
+router.get('/allusers', protect, isAdmin, getAllUsers);
+
+// Get / update / delete user by ID
 router
   .route('/:id')
-  .get(getUserById)
-  .put(updateUser)
-  .delete(deleteUser);
+  .get(protect, isAdmin, getUserById)
+  .put(protect, isAdmin, updateUser)
+  .delete(protect, isAdmin, deleteUser);
 
 module.exports = router;

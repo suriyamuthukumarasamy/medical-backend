@@ -1,32 +1,28 @@
-const User = require('../../customer/models/user.model'); // Import User model
-const bcrypt = require('bcryptjs'); // For hashing and comparing passwords
-const { generateTokenAndSetCookie } = require('../utils/generateTokenAndSetCookie'); // JWT helper
+const User = require('../../customer/models/user.model');
+const bcrypt = require('bcryptjs');
+const { generateTokenAndSetCookie } = require('../utils/generateTokenAndSetCookie');
 
-// ✅ REGISTER NEW USER
+// ✅ REGISTER NEW USER (Public)
 const signup = async (req, res) => {
   const { name, email, password, role } = req.body;
 
   try {
-    // 1. Validate input
     if (!email || !password || !name || !role) {
       return res.status(400).json({ success: false, message: "All fields are required" });
     }
 
-    // 2. Prevent admin registration from public
-    if (role === "admin") {
-      return res.status(403).json({ success: false, message: "Admin registration is not allowed" });
-    }
+    // Prevent public admin registration
+    // if (role === "admin") {
+    //   return res.status(403).json({ success: false, message: "Admin registration is not allowed" });
+    // }
 
-    // 3. Check if user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ success: false, message: "User already exists" });
     }
 
-    // 4. Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 5. Create new user
     const user = await User.create({
       name,
       email,
@@ -34,11 +30,9 @@ const signup = async (req, res) => {
       role: role || "user",
     });
 
-    // 6. Generate JWT
     const token = generateTokenAndSetCookie(res, user._id);
     const tokenExpiry = Date.now() + 24 * 60 * 60 * 1000;
 
-    // 7. Return user (without password)
     const { password: _, ...userData } = user._doc;
 
     res.status(201).json({
@@ -48,7 +42,6 @@ const signup = async (req, res) => {
       tokenExpiry,
       user: userData,
     });
-
   } catch (error) {
     console.error("❌ Signup error:", error.message);
     res.status(500).json({ success: false, message: "Server error" });
@@ -60,23 +53,19 @@ const login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // 1. Find user
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'Invalid email or password' });
     }
 
-    // 2. Match password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
 
-    // 3. Generate token
     const token = generateTokenAndSetCookie(res, user._id);
     const tokenExpiry = Date.now() + 24 * 60 * 60 * 1000;
 
-    // 4. Return user data
     const { password: _, ...userData } = user._doc;
 
     res.status(200).json({
@@ -98,7 +87,7 @@ const logout = async (req, res) => {
   res.status(200).json({ success: true, message: "Logged out successfully" });
 };
 
-// ✅ GET ALL USERS (Admin only)
+// ✅ GET ALL USERS
 const getAllUsers = async (req, res) => {
   try {
     const users = await User.find().select("-password");
@@ -155,7 +144,45 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// ✅ Export all functions
+// ✅ CREATE USER BY ADMIN
+const createUserByAdmin = async (req, res) => {
+  const { name, email, password, role } = req.body;
+
+  try {
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "User created successfully",
+      user: {
+        _id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Create user by admin error:", error.message);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   signup,
   login,
@@ -164,4 +191,5 @@ module.exports = {
   getUserById,
   updateUser,
   deleteUser,
+  createUserByAdmin,
 };

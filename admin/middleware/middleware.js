@@ -1,54 +1,39 @@
 const jwt = require('jsonwebtoken');
 const User = require('../../customer/models/user.model');
 
-//  Middleware to protect routes (requires token)
+// Protect Middleware
 const protect = async (req, res, next) => {
-  let token;
-
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
-    try {
-      //  Extract token
-      token = req.headers.authorization.split(' ')[1];
-
-      //  Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      // Get user and attach to req (without password)
-      req.user = await User.findById(decoded.userId).select('-password');
-
-      return next(); // Allow request
-    } catch (error) {
-      console.error('❌ Error in protect middleware:', error.message);
-      return res
-        .status(401)
-        .json({ success: false, message: 'Not authorized, token failed' });
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer')) {
+      return res.status(401).json({ success: false, message: 'No token' });
     }
-  }
 
-  //  No token found
-  if (!token) {
-    return res
-      .status(401)
-      .json({ success: false, message: 'Not authorized, no token' });
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Either decoded.id or decoded.userId based on your token creation
+    req.user = await User.findById(decoded.id || decoded.userId).select('-password');
+
+    if (!req.user) {
+      return res.status(401).json({ message: 'User not found' });
+    }
+
+    next();
+  } catch (err) {
+    console.error('❌ Token verification failed:', err.message);
+    res.status(401).json({ message: 'Not authorized' });
   }
 };
 
-//  Middleware to allow only admin users
+// Admin Check
 const isAdmin = (req, res, next) => {
-  if (req.user && req.user.role === 'admin') {
-    return next();
-  } else {
-    return res
-      .status(403)
-      .json({ success: false, message: 'Access denied. Admins only.' });
-  }
+  if (req.user?.role === 'admin') return next();
+
+  return res.status(403).json({
+    success: false,
+    message: 'Access denied. Admins only.',
+  });
 };
 
-//  Export both
-module.exports = {
-  protect,
-  isAdmin,
-};
+module.exports = { protect, isAdmin };

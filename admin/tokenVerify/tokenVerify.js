@@ -2,29 +2,36 @@ const jwt = require('jsonwebtoken');
 const User = require('../../customer/models/user.model'); // Import your User model
 
 const protect = async (req, res, next) => {
-    let token;
+  let token;
 
-    // Check for token in the request headers
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        try {
-            // Get token from the header
-            token = req.headers.authorization.split(' ')[1]; // Extract the token part from "Bearer <token>"
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    try {
+      token = req.headers.authorization.split(' ')[1];
 
-            // Decode the token
-            const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify and decode the token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-            // Get the user from the token
-            req.user = await User.findById(decoded.userId).select('-password'); // Find the user by ID and exclude the password
-            next(); // Call the next middleware or route handler
-        } catch (error) {
-            console.error("Error in protect middleware:", error);
-            res.status(401).json({ success: false, message: 'Not authorized, token failed' }); // Send error response if token verification fails
-        }
+      // 🔥 FIXED HERE: use decoded.id not decoded.userId
+      req.user = await User.findById(decoded.id).select('-password');
+
+      return next();
+    } catch (error) {
+      console.error('Error in protect middleware:', error);
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized, token failed',
+      });
     }
+  }
 
-    if (!token) {
-        return res.status(401).json({ success: false, message: 'Not authorized, no token' }); // Send error response if no token was found
-    }
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: 'Not authorized, no token',
+    });
+  }
 };
 
-module.exports = { protect }; // Export the protect middleware
+module.exports = { protect };

@@ -40,6 +40,8 @@ app.get('/', (req, res) => {
 app.use('/api/medicines', require('./product/routes/products.routs'));
 app.use('/api/users', require('./customer/routes/auth.route'));
 app.use('/api/admin', require('./admin/admin.route/admin.route.js')); //  Add admin route here
+app.use('/api/orders', require('./order/controllers/routes/order.routes.js')); // for order
+
 
 // ❌ Optional: if seller route is still in development
 // app.use('/seller', require('./admin/seller.route/seller.route'));

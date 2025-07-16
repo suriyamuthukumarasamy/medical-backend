@@ -18,7 +18,10 @@ app.use(express.urlencoded({ extended: false }));
 app.use(
   cors({
     origin: function (origin, callback) {
-      const allowedOrigins = ['http://localhost:3000', 'https://health-first-ctoy.vercel.app/'];
+      const allowedOrigins = [
+        'http://localhost:3000',
+        'https://health-first-ctoy.vercel.app'
+      ];
 
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
@@ -31,6 +34,7 @@ app.use(
     credentials: true,
   })
 );
+
 
 //  Root Route
 app.get('/', (req, res) => {

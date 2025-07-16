@@ -6,32 +6,31 @@ const connectDB = require('./db/connectDB');
 // Load environment variables
 dotenv.config();
 
-app.use(cors())
+app.use(cors)
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 //  Middleware
-app.use(cors())
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 //  CORS Setup
-// app.use(
-//   cors({
-//     origin: function (origin, callback) {
-//       const allowedOrigins = ['http://localhost:3000', 'https://medical-backend-teal.vercel.app'];
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      const allowedOrigins = ['http://localhost:3000', 'https://health-first-ctoy.vercel.app/'];
 
-//       if (!origin || allowedOrigins.includes(origin)) {
-//         callback(null, true);
-//       } else {
-//         callback(new Error('❌ Not allowed by CORS'));
-//       }
-//     },
-//     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-//     allowedHeaders: ['Content-Type', 'Authorization'],
-//     credentials: true,
-//   })
-// );
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('❌ Not allowed by CORS'));
+      }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  })
+);
 
 //  Root Route
 app.get('/', (req, res) => {

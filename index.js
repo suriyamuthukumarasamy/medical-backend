@@ -3,46 +3,40 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const connectDB = require('./db/connectDB');
 
-// Load environment variables
 dotenv.config();
 
-app.use(cors)
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-//  Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-
-//  CORS Setup
+// ✅ CORS Middleware for ALL ORIGINS
 app.use(cors({
-  origin: '*', // allows all domains
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+app.options('*', cors()); // ✅ Handle preflight requests
 
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
-//  Root Route
+// Root
 app.get('/', (req, res) => {
   res.send('Welcome to the Medicine Backend API');
 });
 
-//  Routes
+// Routes
 app.use('/api/medicines', require('./product/routes/products.routs'));
 app.use('/api/users', require('./customer/routes/auth.route'));
-app.use('/api/admin', require('./admin/admin.route/admin.route.js')); //  Add admin route here
-app.use('/api/orders', require('./order/controllers/routes/order.routes.js')); // for order
+app.use('/api/admin', require('./admin/admin.route/admin.route.js'));
+app.use('/api/orders', require('./order/controllers/routes/order.routes.js'));
 
-
-// ❌ Optional: if seller route is still in development
-// app.use('/seller', require('./admin/seller.route/seller.route'));
-
-//  Handle 404 for undefined routes
+// 404
 app.use((req, res, next) => {
   res.status(404).json({ message: '🚫 Route not found' });
 });
 
-//  Global Error Handler
+// Error handler
 app.use((err, req, res, next) => {
   console.error('❌ Global Error:', err.stack);
   res.status(err.status || 500).json({
@@ -51,7 +45,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Connect to DB and Start Server
+// Start
 connectDB()
   .then(() => {
     app.listen(PORT, () => {
